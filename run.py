@@ -25,7 +25,7 @@ from run_log.run_logger import RunLogger
 # --- LLM (vLLM, OpenAI-совместимый API) ---
 LLM_BASE_URL  = "http://localhost:8000/v1"   # адрес запущенного vLLM сервера
 LLM_API_KEY   = "EMPTY"                      # vLLM не требует настоящий ключ
-LLM_MODEL     = "Qwen/Qwen2.5-72B-Instruct"  # имя модели, переданное в start_vllm.sh
+LLM_MODEL     = "Qwen/Qwen2.5-7B-Instruct"   # имя модели, переданное в start_vllm.sh
 
 # --- Embed-модель (та же, что использовалась при построении ChromaDB) ---
 EMBED_MODEL_NAME = "intfloat/multilingual-e5-large"
@@ -37,10 +37,12 @@ CHROMA_DEFAULT_PATH = (
     "test_db/chroma_db_TestDoc_2"
 )
 
-# --- Текстовый корпус для BM25 (одна строка = один чанк) ---
-# Установите путь к файлу. Если файл недоступен — BM25 будет отключён
-# и поиск будет работать только по вектору.
-CORPUS_PATH: str | None = None  # например: "/path/to/corpus.txt"
+# --- JSONL-корпус для BM25 (каждая строка — {"page_content": ..., ...}) ---
+# Если файл недоступен — BM25 будет отключён, поиск работает только по вектору.
+CORPUS_PATH: str | None = (
+    "/mnt/localhdd/externalssd_data/Artem/ReportGenLLM/notebooks/"
+    "test_db/postprocessed_data.jsonl"
+)
 
 # --- Параметры ретрива ---
 RETRIEVAL_K = 5   # количество чанков на каждый RAG-запрос

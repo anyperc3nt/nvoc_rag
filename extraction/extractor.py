@@ -78,6 +78,7 @@ def extract_group(
         model=model_name,
         response_model=group_schema,
         max_retries=max_retries,
+        temperature=0.1,
         messages=[
             {"role": "system", "content": system_prompt},
             {"role": "user",   "content": user_prompt},

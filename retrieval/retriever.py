@@ -84,7 +84,7 @@ def hybrid_retrieve(
 
     if bm25_index is not None:
         corpus = registry.get_bm25_corpus(collection_name)
-        tokenized_query = query.split()
+        tokenized_query = query.lower().split()
         bm25_scores = bm25_index.get_scores(tokenized_query)
 
         # Берём top-k по BM25 (индексы отсортированы по убыванию score)

@@ -1,3 +1,4 @@
+import json
 from pathlib import Path
 from typing import Optional
 
@@ -39,7 +40,8 @@ class VectorStoreRegistry:
             name:               Имя коллекции (ключ в registry, совпадает с
                                 полем "collection" в FIELD_CONFIG).
             persist_directory:  Путь к папке ChromaDB.
-            corpus_path:        Путь к текстовому файлу корпуса (одна строка = один чанк).
+            corpus_path:        Путь к JSONL-файлу корпуса. Каждая строка —
+                                JSON-объект с полем "page_content".
                                 Если передан — строится BM25-индекс.
         """
         self._stores[name] = Chroma(
@@ -48,14 +50,17 @@ class VectorStoreRegistry:
         )
 
         if corpus_path:
-            texts = [
-                line for line in
-                Path(corpus_path).read_text(encoding="utf-8").splitlines()
-                if line.strip()
-            ]
+            records = []
+            with open(corpus_path, "r", encoding="utf-8") as f:
+                for line in f:
+                    line = line.strip()
+                    if line:
+                        records.append(json.loads(line))
+
+            texts = [r["page_content"] for r in records]
             self._bm25_corpus[name] = texts
-            self._bm25_indexes[name] = BM25Okapi([t.split() for t in texts])
-            print(f"[Registry] '{name}': BM25 построен по {len(texts)} строкам корпуса.")
+            self._bm25_indexes[name] = BM25Okapi([t.lower().split() for t in texts])
+            print(f"[Registry] '{name}': BM25 построен по {len(texts)} чанкам ({corpus_path}).")
 
         print(f"[Registry] '{name}' зарегистрирована: {persist_directory}")
 
