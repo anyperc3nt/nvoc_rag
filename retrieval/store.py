@@ -32,17 +32,22 @@ class VectorStoreRegistry:
         name: str,
         persist_directory: str,
         corpus_path: Optional[str] = None,
+        bm25_record_types: Optional[list[str]] = None,
     ) -> None:
         """
         Регистрирует коллекцию.
 
         Args:
-            name:               Имя коллекции (ключ в registry, совпадает с
-                                полем "collection" в FIELD_CONFIG).
-            persist_directory:  Путь к папке ChromaDB.
-            corpus_path:        Путь к JSONL-файлу корпуса. Каждая строка —
-                                JSON-объект с полем "page_content".
-                                Если передан — строится BM25-индекс.
+            name:                Имя коллекции (ключ в registry, совпадает с
+                                 полем "collection" в FIELD_CONFIG).
+            persist_directory:   Путь к папке ChromaDB.
+            corpus_path:         Путь к JSONL-файлу корпуса. Каждая строка —
+                                 JSON-объект с полем "page_content" и "metadata".
+                                 Если передан — строится BM25-индекс.
+            bm25_record_types:   Если задан, в BM25-индекс включаются только
+                                 записи с metadata.record_type из этого списка.
+                                 Например: ["Text"] — только текстовые чанки.
+                                 None — индексируются все записи корпуса.
         """
         self._stores[name] = Chroma(
             persist_directory=persist_directory,
@@ -57,10 +62,17 @@ class VectorStoreRegistry:
                     if line:
                         records.append(json.loads(line))
 
+            if bm25_record_types:
+                records = [
+                    r for r in records
+                    if r.get("metadata", {}).get("record_type") in bm25_record_types
+                ]
+
             texts = [r["page_content"] for r in records]
             self._bm25_corpus[name] = texts
             self._bm25_indexes[name] = BM25Okapi([t.lower().split() for t in texts])
-            print(f"[Registry] '{name}': BM25 построен по {len(texts)} чанкам ({corpus_path}).")
+            filter_note = f", фильтр record_type={bm25_record_types}" if bm25_record_types else ""
+            print(f"[Registry] '{name}': BM25 построен по {len(texts)} чанкам{filter_note}.")
 
         print(f"[Registry] '{name}' зарегистрирована: {persist_directory}")
 

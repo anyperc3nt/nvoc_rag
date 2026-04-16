@@ -246,6 +246,8 @@ GROUPING_REGISTRY: dict[str, dict] = {
 # ---------------------------------------------------------------------------
 ACTIVE_GROUPING: str = "hybrid"
 
+#one_by_one
+
 
 def get_active_groups() -> dict[str, dict]:
     """Вернуть активную стратегию группировки."""

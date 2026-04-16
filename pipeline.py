@@ -2,7 +2,7 @@
 run_pipeline — оркестратор пайплайна НВОС.
 
 Для каждой группы из активной стратегии:
-  1. RAG-ретрив по каждому полю (hybrid_retrieve)
+  1. RAG-ретрив (dual_retrieve: Text + TableRow) в выбранном режиме
   2. Сборка промпта для всей группы
   3. Вызов LLM (extract_group)
   4. Логирование результатов
@@ -12,10 +12,10 @@ run_pipeline — оркестратор пайплайна НВОС.
 """
 
 import time
+from typing import Literal
 
 import instructor
 
-from config.field_config import FIELD_CONFIG
 from config.group_config import get_active_groups, get_grouping_meta
 from extraction.extractor import extract_group, parsed_to_loggable
 from extraction.prompts import SYSTEM_PROMPT, build_group_prompt
@@ -24,23 +24,32 @@ from retrieval.group_retriever import retrieve_for_group
 from retrieval.store import VectorStoreRegistry
 from run_log.run_logger import GroupCallLog, RunLogger
 
+RetrievalMode = Literal["per_field", "group_deduplicated"]
+
 
 def run_pipeline(
     registry: VectorStoreRegistry,
     llm_client: instructor.Instructor,
     model_name: str,
     logger: RunLogger,
-    retrieval_k: int = 5,
+    retrieval_mode: RetrievalMode = "per_field",
+    k_text: int = 10,
+    k_table: int = 6,
+    group_k: int = 20,
 ) -> dict:
     """
     Запускает полный пайплайн заполнения заявки НВОС.
 
     Args:
-        registry:     Зарегистрированные векторные базы.
-        llm_client:   Instructor-клиент (vLLM или OpenAI).
-        model_name:   Имя модели для вызова LLM.
-        logger:       RunLogger для записи хода выполнения.
-        retrieval_k:  Количество чанков на каждый RAG-запрос.
+        registry:        Зарегистрированные векторные базы.
+        llm_client:      Instructor-клиент (vLLM или OpenAI).
+        model_name:      Имя модели для вызова LLM.
+        logger:          RunLogger для записи хода выполнения.
+        retrieval_mode:  "per_field" — каждое поле получает свои чанки.
+                         "group_deduplicated" — общий дедуплицированный пул на группу.
+        k_text:          Чанков из Text-слоя на каждый RAG-запрос.
+        k_table:         Чанков из TableRow-слоя на каждый RAG-запрос.
+        group_k:         Размер итогового пула в режиме group_deduplicated.
 
     Returns:
         dict[field_id -> Pydantic-объект | None]
@@ -68,7 +77,10 @@ def run_pipeline(
         field_contexts, retrieval_logs = retrieve_for_group(
             registry=registry,
             field_ids=field_ids,
-            k=retrieval_k,
+            k_text=k_text,
+            k_table=k_table,
+            retrieval_mode=retrieval_mode,
+            group_k=group_k,
         )
 
         # --- 2. Сборка промпта ---

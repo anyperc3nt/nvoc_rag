@@ -1,8 +1,11 @@
 """
-hybrid_retrieve — гибридный поиск: векторный (ChromaDB) + BM25 + Reciprocal Rank Fusion.
+Функции поиска по векторной базе.
 
-Если BM25-индекс для коллекции не был зарегистрирован (corpus_path не передавался),
-возвращается только результат векторного поиска.
+hybrid_retrieve — классический гибрид: вектор + BM25 + RRF по одному фильтру.
+dual_retrieve   — параллельный поиск по двум срезам базы:
+                    Text (k_text чанков) + TableRow (k_table чанков).
+                  AllTableMD исключается жёстко: он не передаётся ни в один фильтр.
+                  BM25 применяется только к Text-результатам (если индекс доступен).
 """
 
 from __future__ import annotations
@@ -113,3 +116,82 @@ def hybrid_retrieve(
         RetrievedChunk(text=text, metadata=meta, score=score, source="rrf")
         for text, meta, score in merged
     ]
+
+
+def dual_retrieve(
+    registry: "VectorStoreRegistry",
+    collection_name: str,
+    query: str,
+    k_text: int = 10,
+    k_table: int = 6,
+) -> list[RetrievedChunk]:
+    """
+    Параллельный поиск по двум срезам базы: Text и TableRow.
+
+    AllTableMD исключается жёстко — слишком длинные фрагменты (~4k символов)
+    переполняют контекст LLM.
+
+    BM25 применяется только к Text-результатам: индекс строится по Text-чанкам
+    (bm25_record_types=["Text"] в store.register). Для TableRow BM25 не используется,
+    т.к. строки таблиц обычно короткие и хорошо находятся вектором.
+
+    Args:
+        registry:         VectorStoreRegistry.
+        collection_name:  Имя коллекции.
+        query:            Текстовый запрос.
+        k_text:           Чанков из Text-слоя.
+        k_table:          Чанков из TableRow-слоя.
+
+    Returns:
+        Объединённый список RetrievedChunk, отсортированный по score (Text RRF + TableRow вектор).
+    """
+    # --- 1. Векторный поиск по Text ---
+    text_vector = registry.vector_query(
+        collection_name, query, k=k_text,
+        filters={"record_type": "Text"},
+    )
+    text_vector_hits: list[tuple[str, dict]] = [
+        (doc.page_content, doc.metadata) for doc, _ in text_vector
+    ]
+
+    # --- 2. BM25 по Text (если индекс доступен) ---
+    bm25_index = registry.get_bm25(collection_name)
+    bm25_hits: list[tuple[str, dict]] = []
+    if bm25_index is not None:
+        corpus = registry.get_bm25_corpus(collection_name)
+        bm25_scores = bm25_index.get_scores(query.lower().split())
+        top_indices = sorted(
+            range(len(bm25_scores)), key=lambda i: bm25_scores[i], reverse=True
+        )[:k_text]
+        bm25_hits = [(corpus[i], {}) for i in top_indices if bm25_scores[i] > 0]
+
+    # --- 3. RRF по Text ---
+    if bm25_hits:
+        text_merged = _rrf_merge(text_vector_hits, bm25_hits)[:k_text]
+        text_chunks = [
+            RetrievedChunk(text=t, metadata=m, score=s, source="rrf")
+            for t, m, s in text_merged
+        ]
+    else:
+        text_chunks = [
+            RetrievedChunk(text=t, metadata=m, score=float(k_text - i), source="vector")
+            for i, (t, m) in enumerate(text_vector_hits[:k_text])
+        ]
+
+    # --- 4. Векторный поиск по TableRow ---
+    table_vector = registry.vector_query(
+        collection_name, query, k=k_table,
+        filters={"record_type": "TableRow"},
+    )
+    table_chunks = [
+        RetrievedChunk(
+            text=doc.page_content,
+            metadata=doc.metadata,
+            score=float(k_table - i),
+            source="vector",
+        )
+        for i, (doc, _) in enumerate(table_vector)
+    ]
+
+    # --- 5. Объединяем Text + TableRow ---
+    return text_chunks + table_chunks

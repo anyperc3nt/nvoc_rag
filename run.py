@@ -34,18 +34,25 @@ EMBED_DEVICE     = "cuda:0"
 # --- Векторная база ---
 CHROMA_DEFAULT_PATH = (
     "/mnt/localhdd/externalssd_data/Artem/ReportGenLLM/notebooks/"
-    "test_db/chroma_db_TestDoc_2"
+    "test_db/chroma_db_TestDoc_3"
 )
 
-# --- JSONL-корпус для BM25 (каждая строка — {"page_content": ..., ...}) ---
+# --- JSONL-корпус для BM25 (каждая строка — {"page_content": ..., "metadata": ...}) ---
 # Если файл недоступен — BM25 будет отключён, поиск работает только по вектору.
 CORPUS_PATH: str | None = (
     "/mnt/localhdd/externalssd_data/Artem/ReportGenLLM/notebooks/"
-    "test_db/postprocessed_data.jsonl"
+    "test_db/postprocessed_data_TestDoc_3.jsonl"
 )
+# BM25 строится только по Text-чанкам (исключаем TableRow и AllTableMD)
+BM25_RECORD_TYPES: list[str] = ["Text"]
 
 # --- Параметры ретрива ---
-RETRIEVAL_K = 5   # количество чанков на каждый RAG-запрос
+# Режим: "per_field" — свои чанки для каждого поля
+#        "group_deduplicated" — общий дедуплицированный пул на всю группу
+RETRIEVAL_MODE = "per_field"
+K_TEXT   = 10   # Text-чанков на каждый RAG-запрос
+K_TABLE  = 6    # TableRow-чанков на каждый RAG-запрос
+GROUP_K  = 20   # итоговый пул для group_deduplicated
 
 # --- Логи ---
 LOGS_DIR = "logs"
@@ -78,6 +85,7 @@ def build_registry(embed_model) -> VectorStoreRegistry:
         name="default",
         persist_directory=CHROMA_DEFAULT_PATH,
         corpus_path=CORPUS_PATH,
+        bm25_record_types=BM25_RECORD_TYPES,
     )
 
     return registry
@@ -111,7 +119,10 @@ def main():
         llm_client=llm_client,
         model_name=LLM_MODEL,
         logger=logger,
-        retrieval_k=RETRIEVAL_K,
+        retrieval_mode=RETRIEVAL_MODE,
+        k_text=K_TEXT,
+        k_table=K_TABLE,
+        group_k=GROUP_K,
     )
 
     # Сохраняем итоговый результат рядом с summary
