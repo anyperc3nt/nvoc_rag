@@ -40,8 +40,7 @@ CHROMA_DEFAULT_PATH = (
 # --- JSONL-корпус для BM25 (каждая строка — {"page_content": ..., "metadata": ...}) ---
 # Если файл недоступен — BM25 будет отключён, поиск работает только по вектору.
 CORPUS_PATH: str | None = (
-    "/mnt/localhdd/externalssd_data/Artem/ReportGenLLM/notebooks/"
-    "test_db/postprocessed_data_TestDoc_3.jsonl"
+    "/mnt/localhdd/externalssd_data/Artem/ReportGenLLM/notebooks/test_db/postprocessed_data_3.jsonl"
 )
 # BM25 строится только по Text-чанкам (исключаем TableRow и AllTableMD)
 BM25_RECORD_TYPES: list[str] = ["Text"]
@@ -49,7 +48,7 @@ BM25_RECORD_TYPES: list[str] = ["Text"]
 # --- Параметры ретрива ---
 # Режим: "per_field" — свои чанки для каждого поля
 #        "group_deduplicated" — общий дедуплицированный пул на всю группу
-RETRIEVAL_MODE = "per_field"
+RETRIEVAL_MODE = "group_deduplicated"
 K_TEXT   = 10   # Text-чанков на каждый RAG-запрос
 K_TABLE  = 6    # TableRow-чанков на каждый RAG-запрос
 GROUP_K  = 20   # итоговый пул для group_deduplicated
