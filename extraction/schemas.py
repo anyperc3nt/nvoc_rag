@@ -17,9 +17,9 @@ Pydantic-схемы для структурированного вывода LLM
 NotFound возвращается, когда данные не найдены или неоднозначны.
 """
 
-from typing import Optional
+from typing import Any, Optional
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 
 # =============================================================================
@@ -71,6 +71,19 @@ class BooleanField(BaseModel):
     value: bool = Field(description="True = да, False = нет.")
     confidence: float = Field(ge=0.0, le=1.0)
     source_fragment: str
+
+    @field_validator("value", mode="before")
+    @classmethod
+    def coerce_bool(cls, v: Any) -> bool:
+        """LLM часто возвращает строку ('True'/'False'/'да'/'нет') вместо bool."""
+        if isinstance(v, bool):
+            return v
+        if isinstance(v, str):
+            if v.lower() in ("true", "да", "yes", "1"):
+                return True
+            if v.lower() in ("false", "нет", "no", "0"):
+                return False
+        return v  # Pydantic выдаст ошибку с понятным сообщением
 
 
 # =============================================================================

@@ -99,3 +99,10 @@ class RunLogger:
             json.dump(asdict(self.run_log), f, ensure_ascii=False, indent=2)
         print(f"[Logger] Run complete. Summary: {summary_path}")
         return summary_path
+
+    def write_report(self, result: dict, template_path: Path) -> Path:
+        """Генерирует HTML-отчёт рядом с остальными артефактами рана."""
+        from run_log.report_renderer import render_report
+        report_path = render_report(result, self.run_dir, template_path)
+        print(f"[Logger] HTML-отчёт: {report_path}")
+        return report_path

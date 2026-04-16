@@ -40,7 +40,8 @@ CHROMA_DEFAULT_PATH = (
 # --- JSONL-корпус для BM25 (каждая строка — {"page_content": ..., "metadata": ...}) ---
 # Если файл недоступен — BM25 будет отключён, поиск работает только по вектору.
 CORPUS_PATH: str | None = (
-    "/mnt/localhdd/externalssd_data/Artem/ReportGenLLM/notebooks/test_db/postprocessed_data_3.jsonl"
+    "/mnt/localhdd/externalssd_data/Artem/ReportGenLLM/notebooks/"
+    "test_db/postprocessed_data_TestDoc_3.jsonl"
 )
 # BM25 строится только по Text-чанкам (исключаем TableRow и AllTableMD)
 BM25_RECORD_TYPES: list[str] = ["Text"]
@@ -55,6 +56,9 @@ GROUP_K  = 20   # итоговый пул для group_deduplicated
 
 # --- Логи ---
 LOGS_DIR = "logs"
+
+# --- Шаблон заявки (для генерации HTML-отчёта) ---
+TEMPLATE_PATH = Path("resources/nvoc_txt.txt")
 
 
 # =============================================================================
@@ -132,8 +136,11 @@ def main():
     }
     with open(output_path, "w", encoding="utf-8") as f:
         json.dump(serializable, f, ensure_ascii=False, indent=2)
-
     print(f"[Run] Результат сохранён: {output_path}")
+
+    # Генерируем HTML-отчёт
+    logger.write_report(result, TEMPLATE_PATH)
+
     return result
 
 
