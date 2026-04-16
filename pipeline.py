@@ -18,7 +18,11 @@ import instructor
 
 from config.group_config import get_active_groups, get_grouping_meta
 from extraction.extractor import extract_group, parsed_to_loggable
-from extraction.prompts import SYSTEM_PROMPT, build_group_prompt
+from extraction.prompts import (
+    SYSTEM_PROMPT,
+    build_per_field_prompt,
+    build_shared_context_prompt,
+)
 from extraction.schemas import NotFound
 from retrieval.group_retriever import retrieve_for_group
 from retrieval.store import VectorStoreRegistry
@@ -84,7 +88,11 @@ def run_pipeline(
         )
 
         # --- 2. Сборка промпта ---
-        user_prompt = build_group_prompt(field_ids, field_contexts)
+        if retrieval_mode == "group_deduplicated":
+            shared_chunks = field_contexts[field_ids[0]]
+            user_prompt = build_shared_context_prompt(field_ids, shared_chunks)
+        else:
+            user_prompt = build_per_field_prompt(field_ids, field_contexts)
 
         # --- 3. Вызов LLM ---
         try:
